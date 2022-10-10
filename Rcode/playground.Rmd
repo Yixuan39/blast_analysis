@@ -1,0 +1,161 @@
+---
+title: "intermediate investigation on parchment data"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+date: "2022-10-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+rm(list = ls())
+source('./Functions.R')
+#load('../Rdata/blast_result_withY.Rdata')
+library(scater) # from bioconductor
+library(patchwork)
+set.seed(256)
+```
+
+# Reference file name
+
+**Genome assembly ARS-LIC_NZ_Holstein-Friesian_1**
+
+```{r, include=FALSE}
+# read data
+results_ref1 = read.blast('../ref_withY')
+results = read.blast('../ref_withY2') 
+
+#save.image(file = '../Rdata/blast_result_withY.Rdata')
+```
+
+# percentage of identity V.S. coverage among 22 samples.
+
+**sample SG-LibNeg_S10_L001_R1_001 and SG-LibNeg_S10_L001_R2_001 have few hits that are not informative. Therefore, they are removed**
+
+```{r, echo=FALSE}
+results = results %>% group_by(sample_name) %>% filter(n()>100)
+results = results %>% filter(pident>96, length>110, evalue < 1e-10)
+ggplot(data = results, aes(x=pident, y=length)) +
+  geom_hex(bins = 40) +
+  scale_fill_continuous(type = "viridis") +
+  theme_bw() +
+  facet_wrap(~sample_name) +
+  labs(title = 'percentage of identity v.s. coverage',
+       subtitle = 'pident>96, length>110, evalue < 1e-10')
+
+```
+
+# Number of autosomal chromosome hits V.S. number of Y chromosome hits
+
+```{r, echo=FALSE}
+# # ref1
+# X = 'NC_007331.5'
+# Y ='NC_016145.1'
+# ref2
+X = 'CM038108.1'
+Y = 'CM038109.1'
+n_autosomal_chromosome = results %>% filter(sseqid != X & sseqid != Y) %>% dplyr::count(sample_name)
+n_Y_chromosome = results %>% filter(sseqid == Y) %>% dplyr::count(sample_name)
+autoVSy = merge(n_autosomal_chromosome, n_Y_chromosome, by = "sample_name")
+colnames(autoVSy) = c('sample','autosomal','Y')
+
+p1 = ggplot(data = autoVSy, aes(x = autosomal, y=Y)) +
+  geom_point()+
+  labs(title = 'number of hits in Y chromosome v.s. number of hits in autosomal chromosome')
+p2 = ggplot(data = autoVSy, aes(x = autosomal, y=Y, label = sample)) +
+  geom_label()
+p1/p2 
+
+```
+
+# map of hits in Y chromosome reference sequence
+
+x dots are projections of the curve on x axis
+
+```{r, echo=FALSE}
+Y_chromosome = results %>% filter(sseqid == Y)
+df = Y_chromosome[order(Y_chromosome$sstart),]
+ggplot(data = df) + 
+  geom_point(aes(x=sstart, y=1:dim(df)[1], colour = 'start'), size = 2) +
+  geom_point(aes(x=send, y=1:dim(df)[1], colour = 'end'), size = 0.5) +
+  geom_point(aes(x = sstart, y = 0)) +
+  geom_point(aes(x = send, y = 0)) +
+  xlab('position in reference sequence') +
+  ylab('sorted hit number by sstart') +
+  facet_wrap(~sample_name) +
+  ggplot(data = df) + 
+  geom_point(aes(x=sstart, y=1:dim(df)[1], colour = 'start'), size = 2) +
+  geom_point(aes(x=send, y=1:dim(df)[1], colour = 'end'), size = 0.5) +
+  geom_point(aes(x = sstart, y = 0)) +
+  geom_point(aes(x = send, y = 0)) +
+  xlab('position in reference sequence') +
+  ylab('sorted hit number by sstart') 
+```
+
+```{r, include=FALSE}
+# x = Y_chromosome[order(Y_chromosome$length, decreasing = F),]
+# x=x %>% filter(sample_name == 'SG-047_S3_L001_R1_001')
+# levels(factor(results$sample_name))
+results_ref1 = read.blast('../ref_withY')
+results = read.blast('../ref_withY2') 
+# ref1
+X = 'NC_007331.5'
+Y = 'NC_016145.1'
+
+Y_chromosome = results_ref1 %>% filter(sseqid == Y)
+df = Y_chromosome[order(Y_chromosome$sstart),]
+
+p1 = ggplot(data = df) + 
+  geom_point(aes(x=sstart, y=1:dim(df)[1], colour = 'start'), size = 2) +
+  geom_point(aes(x=send, y=1:dim(df)[1], colour = 'end'), size = 0.5) +
+  geom_point(aes(x = sstart, y = 0)) +
+  geom_point(aes(x = send, y = 0)) +
+  xlab('position in reference sequence') +
+  ylab('sorted hit number by sstart') +
+  ggtitle('reference genome: Btau_5.0.1')
+
+df = Y_chromosome
+
+p2 = ggplot(data = df) + 
+  geom_point(aes(x=sstart, y=1:dim(df)[1], colour = 'start'), size = 2) +
+  geom_point(aes(x=send, y=1:dim(df)[1], colour = 'end'), size = 0.5) +
+  geom_point(aes(x = sstart, y = 0)) +
+  geom_point(aes(x = send, y = 0)) +
+  xlab('position in reference sequence') +
+  ylab('hit number by sstart') 
+
+p1+p2
+
+# ref2
+X = 'CM038108.1'
+Y = 'CM038109.1'
+
+Y_chromosome = results %>% filter(sseqid == Y)
+df = Y_chromosome[order(Y_chromosome$sstart),]
+
+p3 = ggplot(data = df) + 
+  geom_point(aes(x=sstart, y=1:dim(df)[1], colour = 'start'), size = 2) +
+  geom_point(aes(x=send, y=1:dim(df)[1], colour = 'end'), size = 0.5) +
+  geom_point(aes(x = sstart, y = 0)) +
+  geom_point(aes(x = send, y = 0)) +
+  xlab('position in reference sequence') +
+  ylab('sorted hit number by sstart') +
+  ggtitle('ARS-LIC_NZ_Holstein-Friesian_1')
+
+df = Y_chromosome
+
+p4 = ggplot(data = df) + 
+  geom_point(aes(x=sstart, y=1:dim(df)[1], colour = 'start'), size = 2) +
+  geom_point(aes(x=send, y=1:dim(df)[1], colour = 'end'), size = 0.5) +
+  geom_point(aes(x = sstart, y = 0)) +
+  geom_point(aes(x = send, y = 0)) +
+  xlab('position in reference sequence') +
+  ylab('hit number by sstart') 
+
+
+p3+p4
+```
